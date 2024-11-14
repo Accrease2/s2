@@ -12,8 +12,8 @@ data "aws_availability_zones" "azs" {
   state = "available"
 }
 
-#Create public subnet 
-resource "aws_subnet" "subnet" {
+#Create private subnet 
+resource "aws_subnet" "private_subnet" {
   availability_zone = element(data.aws_availability_zones.azs.names, 0)
   vpc_id            = aws_vpc.vpc_master.id
   cidr_block        = "10.0.1.0/24"
@@ -32,23 +32,44 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-#Create a route table
-resource "aws_route_table" "public_route_table" {
+#elastic IP for NAT
+resource "aws_eip" "nat_eip" {
+  vpc = true
+  depends_on = [aws_internet_gateway.igw]
+  tags = {
+    Name = "${var.environment-vpc}"
+  }
+}
+
+#NAT
+resource "aws_nat_gateway" "nat" {
+  allocation_id = "${aws_eip.nat_eip.id}"
+  subnet_id     = "${element(aws_subnet.public_subnet.*.id, 0)}"
+  depends_on    = [aws_internet_gateway.ig]
+  tags = {
+    Name        = "nat"
+  }
+}
+
+#Create a route table for private subnet
+resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.vpc_master.id
 
   tags = {
     Name = "${terraform.workspace}-route-table"
   }
 }
-#Build a route to the internet
-resource "aws_route" "public_internet_gateway" {
-  route_table_id = aws_route_table.public_route_table.id
+
+# NAT GATEWAY
+resource "aws_route" "private_nat_gateway" {
+  route_table_id         = "${aws_route_table.private.id}"
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id = aws_internet_gateway.igw.id
+  nat_gateway_id         = "${aws_nat_gateway.nat.id}"
 }
+
 #Associate our public_subnet with the route to the IGW
 resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public_subnet.id
+  subnet_id      = aws_subnet.private_subnet.id
   route_table_id = aws_route_table.public_route_table.id
 }
 
