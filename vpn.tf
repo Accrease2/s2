@@ -70,7 +70,7 @@ resource "aws_route" "private_nat_gateway" {
 #Associate our public_subnet with the route to the IGW
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.private_subnet.id
-  route_table_id = aws_route_table.public_route_table.id
+  route_table_id = aws_route_table.private_route_table.id
 }
 
 #Create SG for allowing TCP/22 from anywhere, THIS IS FOR TESTING ONLY
